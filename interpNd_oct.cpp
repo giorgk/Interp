@@ -16,7 +16,7 @@ using namespace std;
 
 
 void interpolate_main(double* v0, double p[], double* X, double* Y, double* Z, double* V,
-	int Nx, int Ny, int Nz, int dim, int Np, bool LayElev, int no_data){
+	int Nx, int Ny, int Nz, int dim, int Np, bool LayElev, int no_data, int imeth){
 	double **XX, ***VV, ***ZZ;
 
 	int matrix[4]; matrix[0] = dim; matrix[1] = Nz;
@@ -90,8 +90,9 @@ void interpolate_main(double* v0, double p[], double* X, double* Y, double* Z, d
 
 	if (dim == 1){
 		interp<1> myinterp;
-		myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
 		myinterp.no_data = no_data;
+		myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
+		myinterp.set_Method(imeth);
     	for (int i = 0; i < Np; i++){
 			x0[0] = p[i];
 			v0[i] = myinterp.interpolate(x0);
@@ -99,8 +100,9 @@ void interpolate_main(double* v0, double p[], double* X, double* Y, double* Z, d
 	}
 	else if (dim == 2){
 		interp<2> myinterp;
-		myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
 		myinterp.no_data = no_data;
+		myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
+		myinterp.set_Method(imeth);
 		for (int i = 0; i < Np; i++){
 			x0[0] = p[i];
 			x0[1] = p[i + Np];
@@ -110,8 +112,9 @@ void interpolate_main(double* v0, double p[], double* X, double* Y, double* Z, d
 	}
 	else if (dim == 3){
 		interp<3> myinterp;
-		myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
 		myinterp.no_data = no_data;
+		myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
+		myinterp.set_Method(imeth);
 		if (LayElev){
 			myinterp.set_LayElev(true);
 			myinterp.set_Z(ZZ);
@@ -173,7 +176,8 @@ DEFUN_DLD (interpNd_oct, args, nargout , "v0=interpNd_oct(p,X,Y,Z,V,nodata) \n \
 	Matrix Y;  // coordinates along Y direction
 	NDArray Z;  // coordinates along Z direction
 	NDArray V;  // interpolation data
-	Matrix Nodata;
+	Matrix Nodata; // nodata value
+	Matrix method; // method 1-> linear, 2-> nearest
 
 	//assign input arguments to matrices
 	p  =  args(0).matrix_value();
@@ -183,11 +187,15 @@ DEFUN_DLD (interpNd_oct, args, nargout , "v0=interpNd_oct(p,X,Y,Z,V,nodata) \n \
 	V  =  args(4).array_value();
 	Nodata  =  args(5).matrix_value();
 	int no_data = (int)Nodata(0);
+	method = args(6).matrix_value();
+	int imeth = (int)method(0);
 
+	/* find the number of points to interpolate */
 	dim_vector size_Dim;
 	size_Dim = p.dims();
 	int Np = size_Dim(0);
 	int dim = size_Dim(1);
+
 	size_Dim = X.dims();
 	int Nx  = size_Dim(0);
 	size_Dim = Y.dims();
@@ -207,7 +215,7 @@ DEFUN_DLD (interpNd_oct, args, nargout , "v0=interpNd_oct(p,X,Y,Z,V,nodata) \n \
 	
 	interpolate_main(mV0.fortran_vec(), p.fortran_vec(), X.fortran_vec(),
 					 Y.fortran_vec(), Z.fortran_vec(), V.fortran_vec(),
-					 Nx, Ny, Nz, dim, Np, LayElev, no_data);
+					 Nx, Ny, Nz, dim, Np, LayElev, no_data, imeth);
 	
 	retval(0) = mV0;
 	return octave_value_list(retval);

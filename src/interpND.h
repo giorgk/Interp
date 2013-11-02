@@ -38,7 +38,14 @@ public:
 	//! puts the data to interpolant
 	void get_data_c(int Nx, int Ny, int Nz, double **X, double ***V);
 	void set_Z(double ***Z);
+	void set_Method(int meth);
 private:
+	int Method; /**< Select interpolation method.
+				-# -> linear interpolation.
+				-# -> nearest neighborhood interpolation.
+				-# -> Inverse distance weighting interpolation.
+				*/
+
 	double **X; /**< A pointer which holds the coordinates of the grid.
 				- x[0] holds the x coordinates
 			    - x[1] holds the y coordinate
@@ -98,6 +105,7 @@ interp<dim>::interp(){
 		Matrix_dim[0] = dim;
 	LayElev = false;
 	nP = pow(2,dim);
+	Method = 1;
 }
 
 template <int dim>
@@ -214,17 +222,21 @@ double interp<dim>::interpolate(double x0[]){
 	else if (dim == 2){
 		get_index(J, x, x0, 0);
 		//cout << x[0] << " " << x[1] << endl;
+		//cout << J[0] << " " << J[1] << endl;
 		get_index(I, y, x0, 1);
 		//cout << y[0] << " " << y[1] << endl;
+		//cout << I[0] << " " << I[1] << endl;
 		Q = new double[4]; nQ = 4;
 		Q[0] = V[0][I[0]][J[0]];	Q[1] = V[0][I[0]][J[1]];
 		Q[2] = V[0][I[1]][J[0]];	Q[3] = V[0][I[1]][J[1]];
+		//for(int jj = 0; jj < 4; jj++)
+			//cout << Q[jj] << endl;
 	}
 	else if (dim == 3){
 		get_index(J, x, x0, 0);
-		//cout << x[0] << " " << x[1] << endl;
+		//cout << J[0] << " " << J[1] << " " << x[0] << " " << x[1] << endl;
 		get_index(I, y, x0, 1);
-		//cout << y[0] << " " << y[1] << endl;
+		//cout << I[0] << " " << I[1] << " " << y[0] << " " << y[1] << endl;
 		if (LayElev == false){
 			z = new double[2];
 			get_index(K, z, x0, 2);
@@ -233,6 +245,7 @@ double interp<dim>::interpolate(double x0[]){
 		else{
 			z = new double[10];
 			get_index_Z(I, y, J, x, K, z, x0);
+			//cout << K[0] << " " << K[1] << endl;
 		}
 
 		Q = new double[8]; nQ = 8;
@@ -245,7 +258,7 @@ double interp<dim>::interpolate(double x0[]){
 
 	int Check = CheckNodataValues(Q, nQ);
 
-	if (Check == nQ){ // linear bilinear trilinear interpolation
+	if (Check == nQ && Method == 1){ // linear bilinear trilinear interpolation
 		if (dim == 1){
 			v0 = ( (Q[1] - Q[0]) / (x[1] - x[0]) ) * (x0[0] - x[0]) + Q[0];
 		}
@@ -293,12 +306,14 @@ double interp<dim>::interpolate(double x0[]){
 			tV[0][0][0] = Q[0]; tV[0][0][1] = Q[1];
 			tV[0][1][0] = Q[2]; tV[0][1][1] = Q[3];
 			interp2D.get_data_c(2,2,1,tX,tV);
+			interp2D.no_data = no_data;
 			bottomz = interp2D.interpolate(x0);
 
 			// top layer
 			tV[0][0][0] = Q[4]; tV[0][0][1] = Q[5];
 			tV[0][1][0] = Q[6]; tV[0][1][1] = Q[7];
 			interp2D.get_data_c(2,2,1,tX,tV);
+			interp2D.no_data = no_data;
 			topz = interp2D.interpolate(x0);
 
 			// 1D interpolation
@@ -306,11 +321,13 @@ double interp<dim>::interpolate(double x0[]){
 			tV[0][0][0] = bottomz; tV[0][0][1] = topz;
 			interp<1> interp1D;
 			interp1D.get_data_c(2,1,1,tX,tV);
+			interp1D.no_data = no_data;
 			double z0[1];z0[0] = x0[2];
 			v0 = interp1D.interpolate(z0);
 		}
 	}
 	else{ //Inverse distance weighting
+		//cout << "Check " << Check << endl;
 		double sum_w_u = 0;
 		double sum_w = 0;
 		double w;
@@ -328,6 +345,7 @@ double interp<dim>::interpolate(double x0[]){
 			else if (dim == 3 ){LIST[0][0] = J[0]; LIST[0][1] = I[0]; LIST[0][2] = K[0];}
 
 			int nlist = ListNeighbors(LIST);
+			//cout << "nlist " << nlist << endl;
 			delete[] Q;
 			Q = new double[nlist];
 			nQ = nlist;
@@ -337,6 +355,7 @@ double interp<dim>::interpolate(double x0[]){
 
 			for (int i = 0; i < nlist; i++){
 				Q[i] = V[ LIST[i][2] ][ LIST[i][1] ][ LIST[i][0] ];
+				//cout << Q[i] << endl;
 				for (int idim = 0; idim < dim; idim++)
 					XX[idim][i] = X[idim][LIST[i][idim]];
 			}
@@ -346,11 +365,15 @@ double interp<dim>::interpolate(double x0[]){
 			delete[] LIST;
 		}
 		else{
+			if (dim == 1){
+				XX[0] = new double[nQ];
+				XX[0][0] = x[0]; XX[0][1] = x[1];
+			}
 			if (dim == 2){
 				XX[0] = new double[nQ];
 				XX[1] = new double[nQ];
 				XX[0][0] = x[0]; XX[0][1] = x[1]; XX[0][2] = x[0]; XX[0][3] = x[1];
-				XX[1][0] = y[0]; XX[1][1] = y[1]; XX[1][2] = y[0]; XX[1][3] = y[1];
+				XX[1][0] = y[0]; XX[1][1] = y[0]; XX[1][2] = y[1]; XX[1][3] = y[1];
 			}
 			else if (dim == 3){
 				XX[0] = new double[nQ];
@@ -371,20 +394,38 @@ double interp<dim>::interpolate(double x0[]){
 			}
 		}
 
-		double dst;
+		double dst; double mindst;
+		if (Method == 2)
+			mindst = 1e10;
 		for (int i = 0; i < nQ; i++){
 			dst = 0;
+
 			if (Q[i] == no_data)
 				continue;
 			for (int idim = 0; idim < dim; idim++){
+				//cout << x0[idim] << " - " << XX[idim][i] << endl;
 				dst = dst + pow(x0[idim] - XX[idim][i],2);
 			}
 			dst = sqrt(dst);
-			w = 1/pow(dst, 1.6);
-			sum_w = sum_w + w;
-			sum_w_u = sum_w_u + w * Q[i];
+			if (Method == 2){
+				if (dst < mindst){
+					mindst = dst;
+					v0 = Q[i];
+				}
+
+			}
+			else{
+				//cout << "dst " << dst << endl;
+				if (dst < 0.0000001){
+					v0 = Q[i];
+					return v0;
+				}
+				w = 1/pow(dst, 1.6);
+				sum_w = sum_w + w;
+				sum_w_u = sum_w_u + w * Q[i];
+				v0 = sum_w_u / sum_w;
+			}
 		}
-		v0 = sum_w_u / sum_w;
 
 		for (int i = 0; i < dim; i++)
 			delete[] XX[i];
@@ -459,8 +500,11 @@ void interp<dim>::get_index_Z(int I[], double y[], int J[], double x[], int K[],
 		if (k == 0){
 			tV[0][0][0] = Z[k][I[0]][J[0]]; tV[0][0][1] = Z[k][I[0]][J[1]];
 			tV[0][1][0] = Z[k][I[1]][J[0]]; tV[0][1][1] = Z[k][I[1]][J[1]];
+			//cout << tV[0][0][0] << " " << tV[0][0][1] << " " << tV[0][1][0] << " " << tV[0][1][1] << endl;
 			tempinterp.get_data_c(2,2,1,tX,tV);
+			tempinterp.no_data = no_data;
 			tempz = tempinterp.interpolate(x0);
+			//cout << k << " " << tempz << endl;
 			if (x0[2] < tempz){
 				K[0] = 0; K[1] =0;
 				z[0] = Z[0][I[0]][J[0]] - (Z[1][I[0]][J[0]] - Z[0][I[0]][J[0]]);
@@ -478,7 +522,9 @@ void interp<dim>::get_index_Z(int I[], double y[], int J[], double x[], int K[],
 			tV[0][0][0] = Z[k-1][I[0]][J[0]]; tV[0][0][1] = Z[k-1][I[0]][J[1]];
 			tV[0][1][0] = Z[k-1][I[1]][J[0]]; tV[0][1][1] = Z[k-1][I[1]][J[1]];
 			tempinterp.get_data_c(2,2,1,tX,tV);
+			tempinterp.no_data = no_data;
 			tempz = tempinterp.interpolate(x0);
+			//cout << k << " " << tempz << endl;
 			if (x0[2] > tempz){
 				int Nz = Matrix_dim[1] - 1;
 				K[0] = Nz; K[1] = Nz;
@@ -497,7 +543,9 @@ void interp<dim>::get_index_Z(int I[], double y[], int J[], double x[], int K[],
 			tV[0][0][0] = Z[k][I[0]][J[0]]; tV[0][0][1] = Z[k][I[0]][J[1]];
 			tV[0][1][0] = Z[k][I[1]][J[0]]; tV[0][1][1] = Z[k][I[1]][J[1]];
 			tempinterp.get_data_c(2,2,1,tX,tV);
+			tempinterp.no_data = no_data;
 			double tempz1 = tempinterp.interpolate(x0);
+			//cout << k << " " << tempz1 << endl;
 			if (x0[2] >= tempz && x0[2] < tempz1){
 				K[0] = k - 1; K[1] = k;
 				z[0] = Z[k-1][I[0]][J[0]]; z[1] = Z[k-1][I[0]][J[1]];
@@ -712,4 +760,15 @@ template <int dim>
 void interp<dim>::set_Z(double ***tZ){
 	if (dim == 3)
 		Z = &tZ[0];
+}
+
+template <int dim>
+void interp<dim>::set_Method(int meth){
+	if (meth > 0 && meth < 4)
+		Method = meth;
+	else{
+		cout << "Invalid interpolation method." << endl;
+		cout << "Switching to linear interpolation" << endl;
+		Method = 1;
+	}
 }

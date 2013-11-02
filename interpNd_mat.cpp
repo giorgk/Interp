@@ -22,6 +22,7 @@ using namespace std;
 #define	Z_IN	    prhs[3] // Z coordinates
 #define	V_IN	    prhs[4] // Values
 #define	NODATA_IN	prhs[5] // nodata value
+#define	METH_IN     prhs[6] // method 1-> linear, 2-> nearest
 
 
 /* Output Arguments */
@@ -29,10 +30,10 @@ using namespace std;
 
 
 void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
-    double *p, *X, *Y, *Z, *V, *v0;
+    double *p, *X, *Y, *Z, *V, *v0, *meth;
     bool LayElev;
     double **XX, ***VV, ***ZZ, *nodata;
-    int Nx, Ny, Nz;
+    int Nx, Ny, Nz, iMeth;
     int matrix[4];
             
     p = mxGetPr( P_IN );
@@ -41,6 +42,8 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
     Z = mxGetPr( Z_IN );
     V = mxGetPr( V_IN );
     nodata = mxGetPr( NODATA_IN );
+    meth = mxGetPr( METH_IN );
+    iMeth = (int)meth[0];
     
     
     /* find the number of points to interpolate */
@@ -62,15 +65,18 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
         Nz = mxGetM(Z_IN); matrix[1] = Nz;
     }
     
-    //cout << Nx << " " << Ny << " " << Nz << endl;
+    cout << Nx << " " << Ny << " " << Nz << endl;
 
     
     /* find the type of interpolation in case of 3D */
     const mwSize *dims_Z;
     if (dim == 3){
-        if (mxGetNumberOfDimensions(Z_IN) == 3)
+        if (mxGetNumberOfDimensions(Z_IN) == 3){
             LayElev = true;
-        dims_Z = mxGetDimensions(Z_IN);
+            dims_Z = mxGetDimensions(Z_IN);
+            matrix[1] = dims_Z[2];
+            Nz = dims_Z[2];
+        }
     }
     //std::cout << mxGetNumberOfDimensions(Z_IN) << std::endl;
     
@@ -99,7 +105,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
         for (int i = 0; i < matrix[1]; i++){
             ZZ[i] = new double*[matrix[2]];
             for (int j = 0; j < matrix[2]; j++)
-                ZZ[i][j] = new double[matrix[3]];  
+                ZZ[i][j] = new double[matrix[3]];
         }
     }
     
@@ -153,6 +159,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
         myinterp.no_data = nodata[0];
         cout << myinterp.no_data << endl;
         myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
+        myinterp.set_Method(iMeth);
         for (int i = 0; i < Np; i++){
              x0[0] = p[i];
              v0[i]=myinterp.interpolate(x0);
@@ -163,6 +170,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
         interp<2> myinterp;
         myinterp.no_data = nodata[0];
         myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
+        myinterp.set_Method(iMeth);
         for (int i = 0; i < Np; i++){
             x0[0] = p[i];
             x0[1] = p[i + Np];
@@ -173,6 +181,7 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
         interp<3> myinterp;
         myinterp.no_data = nodata[0];
         myinterp.get_data_c(matrix[3], matrix[2], matrix[1], XX, VV);
+        myinterp.set_Method(iMeth);
         if (LayElev){
             myinterp.set_LayElev(true);
             myinterp.set_Z(ZZ);
@@ -187,9 +196,9 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
         }
         //myinterp.destroy();
     }
-    
-    
-    
+//    
+//    
+//    
     // Destroy matrices
     for (int i = 0; i < dim; i++)
         delete[] XX[i];
@@ -200,7 +209,16 @@ void mexFunction(int nlhs, mxArray *plhs[], int	nrhs, const mxArray	*prhs[]){
             delete[] VV[i][j];
         delete[] VV[i];
     }
-    //delete[] VV;
-    delete[] x0;
+    delete[] VV;
+    if (LayElev){
+        for (int i = 0; i < matrix[1]; i++){
+            for (int j = 0; j < matrix[2]; j++)
+                delete[] ZZ[i][j];
+            delete[] ZZ[i];
+        }
+        delete[] ZZ;
+    }
+
+//    delete[] x0;
   
 }

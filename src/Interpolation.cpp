@@ -20,11 +20,12 @@ int main() {
 	cout << "@@!!!Hello World!!!@@" << endl; // prints @@!!!Hello World!!!@@
 
 
-
+/*
 	//-----------1D interpolation -----------
 	char* namefile = "interp1D_example.txt";
 	interp<1> myinterp1;
 	myinterp1.get_data_file(namefile);
+	myinterp1.set_Method(2);
 	double X1[1];
 	X1[0] = -1.0;
 	while (X1[0] < 11){
@@ -32,7 +33,7 @@ int main() {
 		X1[0] = X1[0] + 0.33;
 	}
 	myinterp1.destroy();
-
+*/
 
 
 	//------------2D interpolation ------------
@@ -40,24 +41,26 @@ int main() {
 	interp<2> myinterp2;
 	myinterp2.set_nP(11);
 	myinterp2.get_data_file(namefile1);
+	myinterp2.set_Method(2);
 	double X2[2];
 	X2[0] = -3.5; X2[1] = -3.5;
 	while (X2[1] < 3.5){
 		while (X2[0] < 3.5){
 			cout << X2[0] << "\t" << X2[1] << "\t" << myinterp2.interpolate(X2) << endl;
-			X2[0] = X2[0] + 0.3;
+			X2[0] = X2[0] + 0.1;
 		}
 		X2[0] = -3.5;
-		X2[1] = X2[1] + 0.3;
+		X2[1] = X2[1] + 0.1;
 	}
 	myinterp2.destroy();
 
 
-
+/*
 	//------------3D interpolation ------------
 	char* namefile2 = "interp3D_example.txt";
 	interp<3> myinterp3;
 	myinterp3.get_data_file(namefile2);
+	myinterp3.set_Method(2);
 	double X3[3];
 	X3[0] = -1.0; X3[1] = -4.5; X3[2] = -4;
 	while (X3[2] < 4.5){
@@ -81,6 +84,7 @@ int main() {
 	interp<3> myinterp4;
 	myinterp4.set_LayElev(true);
 	myinterp4.get_data_file(namefile3);
+	myinterp4.set_Method(2);
 	double X4[3];
 	X4[0] = -1.0; X4[1] = -3.5; X4[2] = -4.5;
 	while (X4[2] < 6.2){
@@ -99,6 +103,6 @@ int main() {
 
 
 
-
+*/
 	return 0;
 }
